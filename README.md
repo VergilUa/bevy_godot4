@@ -17,7 +17,7 @@ The architecture in this crate is based on [bevy_godot](https://github.com/rand0
 ```
 [dependencies]
 bevy_godot4 = { git = "https://github.com/jrockett6/bevy_godot4", branch = "main" }
-godot = "0.1.3"
+godot = "0.2.4"
 ```
 3. Create a function that takes a `&mut App` and builds your bevy app, and annotate it with `#[bevy_app]`:
 ```rust
