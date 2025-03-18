@@ -32,14 +32,13 @@ impl BevyApp {
         });
     }
 
-    pub fn with_bevy_app<F, R>(f: F) -> R
+    pub fn with_bevy_app<F, R>(f: F) -> Option<R>
     where
         F: FnOnce(&mut App) -> R,
     {
         BEVY_APP.with(|app_cell| {
             let mut borrow = app_cell.borrow_mut();
-            let app = borrow.as_mut().expect("Bevy app not set!");
-            f(app)
+            borrow.as_mut().map(|app| f(app))
         })
     }
 }
