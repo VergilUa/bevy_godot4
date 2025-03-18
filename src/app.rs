@@ -8,6 +8,7 @@ use godot::{
 use crate::prelude::*;
 use std::{
     panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
+    cell::RefCell,
     sync::Mutex,
 };
 
@@ -16,19 +17,30 @@ lazy_static::lazy_static! {
     pub static ref APP_BUILDER_FN: Mutex<Option<Box<dyn Fn(&mut App) + Send>>> = Mutex::new(None);
 }
 
-#[derive(GodotClass, Default)]
-#[class(base=Node)]
-pub struct BevyApp {
-    app: Option<App>,
+thread_local! {
+    static BEVY_APP: RefCell<Option<App>> = RefCell::new(None);
 }
 
+#[derive(GodotClass, Default)]
+#[class(base=Node)]
+pub struct BevyApp { }
+
 impl BevyApp {
-    pub fn get_app(&self) -> Option<&App> {
-        self.app.as_ref()
+    pub fn set_bevy_app(app: App) {
+        BEVY_APP.with(|app_cell| {
+            *app_cell.borrow_mut() = Some(app);
+        });
     }
 
-    pub fn get_app_mut(&mut self) -> Option<&mut App> {
-        self.app.as_mut()
+    pub fn with_bevy_app<F, R>(f: F) -> R
+    where
+        F: FnOnce(&mut App) -> R,
+    {
+        BEVY_APP.with(|app_cell| {
+            let mut borrow = app_cell.borrow_mut();
+            let app = borrow.as_mut().expect("Bevy app not set!");
+            f(app)
+        })
     }
 }
 
@@ -60,7 +72,7 @@ impl INode for BevyApp {
         #[cfg(feature = "assets")]
         app.add_plugins(crate::assets::GodotAssetsPlugin);
 
-        self.app = Some(app);
+        BevyApp::set_bevy_app(app);
     }
 
     fn process(&mut self, _delta: f64) {
@@ -68,18 +80,16 @@ impl INode for BevyApp {
             return;
         }
 
-        if let Some(app) = self.app.as_mut() {
+        BevyApp::with_bevy_app(|app| {
             app.insert_resource(GodotVisualFrame);
 
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| app.update())) {
-                self.app = None;
-
                 eprintln!("bevy app update panicked");
                 resume_unwind(e);
             }
 
             app.world_mut().remove_resource::<GodotVisualFrame>();
-        }
+        });
     }
 
     fn physics_process(&mut self, _delta: f64) {
@@ -87,17 +97,15 @@ impl INode for BevyApp {
             return;
         }
 
-        if let Some(app) = self.app.as_mut() {
+        BevyApp::with_bevy_app(|app| {
             app.insert_resource(GodotPhysicsFrame);
 
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| app.update())) {
-                self.app = None;
-
                 eprintln!("bevy app update panicked");
                 resume_unwind(e);
             }
 
             app.world_mut().remove_resource::<GodotPhysicsFrame>();
-        }
+        });
     }
 }
