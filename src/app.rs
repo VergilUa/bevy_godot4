@@ -19,7 +19,6 @@ lazy_static::lazy_static! {
 
 thread_local! {
     static BEVY_APP: RefCell<Option<App>> = RefCell::new(None);
-    static PENDING_FUNCTIONS: RefCell<Vec<Box<dyn FnOnce(&mut App)>>> = RefCell::new(Vec::new());
 }
 
 #[derive(GodotClass, Default)]
@@ -27,48 +26,19 @@ thread_local! {
 pub struct BevyApp { }
 
 impl BevyApp {
-    /// Sets the global Bevy app and executes any enqueued functions.
     pub fn set_bevy_app(app: App) {
         BEVY_APP.with(|app_cell| {
             *app_cell.borrow_mut() = Some(app);
-        });
-
-        // Drain the pending functions queue and execute each function.
-        BEVY_APP.with(|app_cell| {
-            if let Some(ref mut app) = *app_cell.borrow_mut() {
-                PENDING_FUNCTIONS.with(|pending| {
-                    // Drain the queue; note: draining reverses order, so if order matters,
-                    // consider using another approach.
-                    for func in pending.borrow_mut().drain(..) {
-                        func(app);
-                    }
-                });
-            }
         });
     }
 
     pub fn with_bevy_app<F, R>(f: F) -> Option<R>
     where
-        F: FnOnce(&mut App) -> R + 'static,
+        F: FnOnce(&mut App) -> R,
     {
         BEVY_APP.with(|app_cell| {
-            if let Some(ref mut app) = *app_cell.borrow_mut() {
-                // App is available, so execute immediately.
-                Some(f(app))
-            } else {
-                // TODO Godot doesn't seems to have a proper lib loading order.
-                // TODO Enqueueing should not be necessary if Bevy App loads faster than actual
-                // TODO _init / _ready is called.
-                //
-                // App not set yet; enqueue the function.
-                PENDING_FUNCTIONS.with(|pending| {
-                    pending.borrow_mut().push(Box::new(move |app| {
-                        // We ignore the result here since we can't return it later.
-                        f(app);
-                    }));
-                });
-                None
-            }
+            let mut borrow = app_cell.borrow_mut();
+            borrow.as_mut().map(|app| f(app))
         })
     }
 }
