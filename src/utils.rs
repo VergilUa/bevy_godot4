@@ -14,11 +14,11 @@ pub struct GodotFixedUpdate;
 /// Adds `as_godot_fixed_update_system` that schedules a system only for the physics frame
 pub trait AsGodotFixedUpdate<Params> {
     #[allow(clippy::wrong_self_convention)]
-    fn as_godot_fixed_update_system(self) -> SystemConfigs;
+    fn as_gd_fixed_update(self) -> SystemConfigs;
 }
 
 impl<Params, T: IntoSystem<(), (), Params>> AsGodotFixedUpdate<Params> for T {
-    fn as_godot_fixed_update_system(self) -> SystemConfigs {
+    fn as_gd_fixed_update(self) -> SystemConfigs {
         self.run_if(resource_exists::<GodotFixedUpdate>)
     }
 }
@@ -26,11 +26,11 @@ impl<Params, T: IntoSystem<(), (), Params>> AsGodotFixedUpdate<Params> for T {
 /// Adds `as_godot_update_system` that schedules a system only for the frame
 pub trait AsVisualSystem<Params> {
     #[allow(clippy::wrong_self_convention)]
-    fn as_godot_update_system(self) -> SystemConfigs;
+    fn as_gd_update(self) -> SystemConfigs;
 }
 
 impl<Params, T: IntoSystem<(), (), Params>> AsVisualSystem<Params> for T {
-    fn as_godot_update_system(self) -> SystemConfigs {
+    fn as_gd_update(self) -> SystemConfigs {
         self.run_if(resource_exists::<GodotUpdate>)
     }
 }
