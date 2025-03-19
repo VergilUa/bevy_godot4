@@ -11,6 +11,7 @@ use std::{
     cell::RefCell,
     sync::Mutex,
 };
+use crate::timing::TimingPlugin;
 
 lazy_static::lazy_static! {
     #[doc(hidden)]
@@ -62,6 +63,7 @@ impl INode for BevyApp {
             .add_plugins(bevy::core::FrameCountPlugin)
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .add_plugins(bevy::time::TimePlugin)
+            .add_plugins(TimingPlugin)
             .add_plugins(bevy::hierarchy::HierarchyPlugin)
             .add_plugins(crate::scene::PackedScenePlugin)
             .init_non_send_resource::<crate::scene_tree::SceneTreeRefImpl>();
@@ -74,37 +76,41 @@ impl INode for BevyApp {
         BevyApp::set_bevy_app(app);
     }
 
-    fn process(&mut self, _delta: f64) {
+    fn process(&mut self, delta_time: f64) {
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
 
         BevyApp::with_bevy_app(|app| {
-            app.insert_resource(GodotVisualFrame);
+            TimingPlugin::update_godot_dt(delta_time, app);
+            
+            app.insert_resource(GodotUpdate);
 
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| app.update())) {
                 eprintln!("bevy app update panicked");
                 resume_unwind(e);
             }
 
-            app.world_mut().remove_resource::<GodotVisualFrame>();
+            app.world_mut().remove_resource::<GodotUpdate>();
         });
     }
 
-    fn physics_process(&mut self, _delta: f64) {
+    fn physics_process(&mut self, fixed_delta: f64) {
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
 
         BevyApp::with_bevy_app(|app| {
-            app.insert_resource(GodotPhysicsFrame);
+            TimingPlugin::update_godot_fixed_dt(fixed_delta, app);
+            
+            app.insert_resource(GodotFixedUpdate);
 
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| app.update())) {
                 eprintln!("bevy app update panicked");
                 resume_unwind(e);
             }
 
-            app.world_mut().remove_resource::<GodotPhysicsFrame>();
+            app.world_mut().remove_resource::<GodotFixedUpdate>();
         });
     }
 }
